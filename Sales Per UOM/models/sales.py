@@ -37,7 +37,7 @@ class NewSaleOrder(models.Model):
 
 
         if not self.quoteproduct:
-            self.quoteqty = False
+            self.quoteqty = 1
             self.quoteproductuom = False
             self.quoteuserprice = False
             self.quotesaleqty = False
@@ -48,6 +48,7 @@ class NewSaleOrder(models.Model):
 
         if (product.uom_id):
             vals = {}
+            self.quoteqty = 1
             self.quoteproductuom = product.uom_id
             self.quotesaleuomcat = self.quoteproduct.uom_id.category_id.id
             domain = {'quoteproductuom': [('category_id', '=', self.quotesaleuomcat)]}
@@ -117,7 +118,7 @@ class NewSaleOrder(models.Model):
                 pricefactor = newuom.factor
 
             if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
+                self.quoteuomcost = 'Div By 0'
                 return {}
 
             convfactor = float(float(salefactor) / float(pricefactor))
@@ -143,18 +144,18 @@ class NewSaleOrder(models.Model):
                 salefactor = uom.factor
 
             if (newuom.uom_type == 'bigger'):
-                pricefactor = newuom.factor_inv
+                qtyfactor = newuom.factor_inv
             else:
-                pricefactor = newuom.factor
+                qtyfactor = newuom.factor
 
-            if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
+            if (qtyfactor == 0):
+                self.quoteexactuomqty = 'Div By 0'
                 return {}
 
-            convfactor = float(float(salefactor) / float(pricefactor))
-            convprice = float(float(qty) * float(convfactor))
-            convprice = round(convprice, 2)
-            self.quoteexactuomqty= str(convprice) + " " + uom.name
+            convfactor = float(float(salefactor) / float(qtyfactor))
+            convqty = float(float(qty) * float(convfactor))
+            convqty = round(convqty, 2)
+            self.quoteexactuomqty= str(convqty) + " " + uom.name
             return {}
 
         self.quoteexactuomqty = 'N/A'
@@ -180,11 +181,6 @@ class NewSaleOrder(models.Model):
                 pricefactor = newuom.factor
 
             if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
-                return {}
-
-            if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
                 return {}
 
             convfactor = float(float(salefactor) / float(pricefactor))
@@ -217,11 +213,6 @@ class NewSaleOrder(models.Model):
                 pricefactor = newuom.factor
 
             if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
-                return {}
-
-            if (pricefactor == 0):
-                self.quoteuomprice = 'Div By 0'
                 return {}
 
             convfactor = float(float(salefactor) / float(pricefactor))
@@ -238,8 +229,10 @@ class NewSaleOrder(models.Model):
 
     @api.multi
     def newlinecreate(self):
-
         if not (self.quoteproduct and self.quotesaleqty and self.quoteproductuom and self.quoteactualprice):
+            return
+
+        if (self.quotesaleqty < 1) or (self.quoteactualprice < .01):
             return
 
         if not (self.quoteproduct.description):
@@ -247,11 +240,12 @@ class NewSaleOrder(models.Model):
         else:
             description = self.quoteproduct.description
 
-
-        vals = {'order_id': self.id, 'name': description, 'price_unit': self.quoteactualprice, 'product_id': self.quoteproduct.id, 'product_uom_qty': self.quotesaleqty, 'product_uom': self.quoteproduct.uom_id.id}
+        vals = {'order_id': self.id, 'name': description, 'price_unit': self.quoteactualprice,
+                'product_id': self.quoteproduct.id, 'product_uom_qty': self.quotesaleqty,
+                'product_uom': self.quoteproduct.uom_id.id}
         newline = self.env['sale.order.line'].create(vals)
         newline.product_id_change()
-        tempvals = { 'price_unit': self.quoteactualprice, }
+        tempvals = {'price_unit': self.quoteactualprice,}
         newline.write(tempvals)
         self.quoteproduct = False
 
